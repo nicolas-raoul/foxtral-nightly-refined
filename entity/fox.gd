@@ -48,7 +48,7 @@ class TaskRest:
 		
 		if moving==false:
 			
-			if randf()>0.99:
+			if randf()>0.98:
 				moving=true
 				moving_timer = Timer.new()
 				moving_timer.wait_time = random_moving_time

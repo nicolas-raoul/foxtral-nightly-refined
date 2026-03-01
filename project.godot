@@ -34,6 +34,10 @@ window/size/viewport_height=180
 window/stretch/mode="viewport"
 window/stretch/scale_mode="integer"
 
+[gui]
+
+theme/custom="uid://6a3t6mbsq2ng"
+
 [physics]
 
 3d/physics_engine="Jolt Physics"

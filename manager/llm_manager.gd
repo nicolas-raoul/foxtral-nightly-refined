@@ -53,7 +53,8 @@ var _api_key: String = "MoEMaEZrUWjBNdsmQoyTigL9ylcy5Y9X"
 
 var sentence_parsed:String = ""
 
-var llm_available = true
+var is_recording: bool = false
+var llm_available: bool = true
 
 func _ready() -> void:
 	
@@ -73,41 +74,58 @@ func _ready() -> void:
 	# Create flush timer to periodically flush audio buffer
 	_flush_timer = Timer.new()
 	_flush_timer.wait_time = 600 # Flush every 1.5 seconds
-	_flush_timer.autostart=true
 	_flush_timer.timeout.connect(_on_flush_timer)
 	audio_capture.audio_chunk_ready.connect(_on_audio_chunk_ready)
 	add_child(_flush_timer)
 	
 	audio_capture.start_recording()
 	mistral_realtime_client.connect_to_mistral(_api_key)
-
-func _on_audio_chunk_ready(audio_data: PackedByteArray):
 	
-	mistral_realtime_client.send_audio(audio_data)
+	await GuiManager.ready
 
-func _on_flush_timer():
-	# Periodically flush audio to trigger transcription
-	print("Flushing audio buffer...")
+	GuiManager.gui_scene.talk_pressed.connect(_on_talk_start)
+	GuiManager.gui_scene.talk_released.connect(_on_talk_stop)
+
+func _on_audio_chunk_ready(audio_data: PackedByteArray) -> void:
+	if is_recording:
+		mistral_realtime_client.send_audio(audio_data)
+
+func _on_flush_timer() -> void:
+	if is_recording:
+		print("Flushing audio buffer...")
+		mistral_realtime_client.flush_audio()
+
+func _on_talk_start() -> void:
+	is_recording = true
+	_flush_timer.start()
+	print("Recording started")
+
+func _on_talk_stop() -> void:
+	is_recording = false
+	_flush_timer.stop()
 	mistral_realtime_client.flush_audio()
+	print("Recording stopped")
+	
+	# Wait for LLM to be available
+	while not llm_available:
+		await get_tree().create_timer(0.1).timeout
+	
+	# Send chat completion with accumulated sentence
+	if sentence_parsed.length() > 0:
+		llm_available = false
+		var messages = [
+			{"role": "system", "content": system_prompt},
+			{"role": "user", "content": sentence_parsed}
+		]
+		mistral_llm_client.send_chat_completion(messages, 0.7, 500, true)
 
 func _on_tts_ready(tts_text:String):
-	
-	sentence_parsed+=tts_text
+	sentence_parsed += tts_text
 	
 	if sentence_parsed.length() > order_number_character:
 		sentence_parsed = sentence_parsed.substr(sentence_parsed.length() - order_number_character)
 	
 	GuiManager.change_caption(sentence_parsed)
-
-	
-	if llm_available:
-		
-		var messages = [
-			{"role": "system", "content": system_prompt},
-			{"role": "user", "content": sentence_parsed}
-		]
-
-		mistral_llm_client.send_chat_completion(messages, 0.7, 500, true)
 	
 func _on_llm_completion_received(response: Dictionary):
 	var content=response["choices"][0]["message"]["content"]
@@ -122,14 +140,13 @@ func _on_llm_completion_received(response: Dictionary):
 		if new_order != null:
 			
 			EntityManager.execute_order(new_order)
-			sentence_parsed=""
+			sentence_parsed = ""
 			GuiManager.change_caption("")
-			
 	
 	llm_available = true
 	
 func _on_llm_completion_error(error_message: String):
-	print(error_message)
+	print("LLM Error: ", error_message)
 	llm_available = true 
 
 func _parse_json_response(json_string: String) -> Dictionary:
