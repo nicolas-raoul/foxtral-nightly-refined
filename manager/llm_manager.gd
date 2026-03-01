@@ -49,12 +49,12 @@ var _flush_timer: Timer = null
 
 const order_number_character=70
 
-var _api_key: String = "MoEMaEZrUWjBNdsmQoyTigL9ylcy5Y9X"
-
 var sentence_parsed:String = ""
 
 var is_recording: bool = false
 var llm_available: bool = true
+
+var _api_key: String = EnvLoader.get_var("MISTRAL_API_KEY")
 
 func _ready() -> void:
 	
