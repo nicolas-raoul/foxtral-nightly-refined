@@ -34,6 +34,9 @@ var hunger_sprite: Sprite2D
 
 var mouse_pos:Vector2
 
+var _is_mic_enabled: bool = false
+var _alive_timer: float = 0.0
+
 enum TaskType{
 	GATHER,
 	BUILD,
@@ -236,6 +239,29 @@ func _ready() -> void:
 	hunger_sprite.scale = Vector2(0.5, 0.5)
 	hunger_sprite.visible = false
 	add_child(hunger_sprite)
+	
+	if GuiManager != null:
+		if not GuiManager.is_node_ready():
+			await GuiManager.ready
+		if GuiManager.gui_scene != null:
+			GuiManager.gui_scene.talk_pressed.connect(_on_talk_start)
+			GuiManager.gui_scene.talk_released.connect(_on_talk_stop)
+
+func _on_talk_start() -> void:
+	_is_mic_enabled = true
+
+func _on_talk_stop() -> void:
+	_is_mic_enabled = false
+
+func _process(delta: float) -> void:
+	_alive_timer += delta
+	var target_alpha: float = 0.0
+	if _alive_timer < 5.0 or _is_mic_enabled:
+		target_alpha = 1.0
+	
+	var current_alpha = nametag.modulate.a
+	if current_alpha != target_alpha:
+		nametag.modulate.a = move_toward(current_alpha, target_alpha, delta)
 
 func _pick_random_fruit() -> void:
 	var col = randi() % FRUIT_COLS
